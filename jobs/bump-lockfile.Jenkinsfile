@@ -5,7 +5,7 @@ node {
     pipecfg = pipeutils.load_pipecfg()
 }
 
-repo = "coreos/fedora-coreos-config"
+repo = "gursewak1997/os"
 botCreds = "github-coreosbot-token-username-password"
 
 properties([
@@ -36,7 +36,7 @@ properties([
 
 // runtime parameter always wins
 def cosa_img = params.COREOS_ASSEMBLER_IMAGE
-cosa_img = cosa_img ?: pipeutils.get_cosa_img(pipecfg, params.STREAM)
+cosa_img = 'quay.io/coreos-assembler/coreos-assembler:main'
 
 echo "Waiting for bump-${params.STREAM} lock"
 currentBuild.description = "[${params.STREAM}] Waiting"
@@ -80,16 +80,16 @@ lock(resource: "bump-${params.STREAM}") {
           git config --global user.email "coreosbot@fedoraproject.org"
         """)
 
-        def branch = params.STREAM
+        def branch = "master"
         def forceTimestamp = false
         def haveChanges = false
         def src_config_commit = shwrapCapture("git ls-remote https://github.com/${repo} ${branch} | cut -d \$'\t' -f 1")
-        def variant = stream_info.variant ? "--variant ${stream_info.variant}" : ""
-        shwrap("cosa init --branch ${branch} ${variant} --commit=${src_config_commit} https://github.com/${repo}")
+        // def variant = stream_info.variant ? "--variant ${stream_info.variant}" : ""
+        shwrap("cosa init --branch ${branch} --commit=${src_config_commit} https://github.com/${repo}")
 
         def lockfile, pkgChecksum, pkgTimestamp
         def skip_tests_arches = params.SKIP_TESTS_ARCHES.split()
-        def arches = pipeutils.get_additional_arches(pipecfg, params.STREAM).plus("x86_64")
+        def arches = ["x86_64"]
         def archinfo = arches.collectEntries{[it, [:]]}
         for (architecture in archinfo.keySet()) {
             def arch = architecture
@@ -295,7 +295,7 @@ lock(resource: "bump-${params.STREAM}") {
         throw e
     } finally {
         if (currentBuild.result != 'SUCCESS') {
-            pipeutils.trySlackSend(message: "<${env.BUILD_URL}|bump-lockfile #${env.BUILD_NUMBER} (${params.STREAM})>")
+            // pipeutils.trySlackSend(message: "<${env.BUILD_URL}|bump-lockfile #${env.BUILD_NUMBER} (${params.STREAM})>")
         }
     }
 }}} // cosaPod, timeout, and lock finish here
