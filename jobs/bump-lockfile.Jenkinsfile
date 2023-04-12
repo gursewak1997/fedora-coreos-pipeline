@@ -5,7 +5,7 @@ node {
     pipecfg = pipeutils.load_pipecfg()
 }
 
-repo = "coreos/fedora-coreos-config"
+repo = "gursewak1997/os"
 botCreds = "github-coreosbot-token-username-password"
 
 properties([
@@ -13,7 +13,7 @@ properties([
     pipelineTriggers([]),
     parameters([
         choice(name: 'STREAM',
-               choices: pipeutils.streams_of_type(pipecfg, 'development'),
+               choices: pipeutils.get_streams_choices(pipecfg),
                description: 'CoreOS development stream to bump'),
         string(name: 'SKIP_TESTS_ARCHES',
                description: 'Space-separated list of architectures to skip tests on',
@@ -80,12 +80,14 @@ lock(resource: "bump-${params.STREAM}") {
           git config --global user.email "coreosbot@fedoraproject.org"
         """)
 
-        def branch = params.STREAM
+        def branch = pipeutils.get_source_config_ref_for_stream(pipecfg, params.STREAM)
         def forceTimestamp = false
         def haveChanges = false
         def src_config_commit = shwrapCapture("git ls-remote https://github.com/${repo} refs/heads/${branch} | cut -d \$'\t' -f 1")
+        def yumrepos = pipecfg.source_config.yumrepos ? "--yumrepos ${pipecfg.source_config.yumrepos}" : ""
+        def yumrepos_ref = pipecfg.source_config.yumrepos_ref ? "--yumrepos-branch ${pipecfg.source_config.yumrepos_ref}" : ""        
         def variant = stream_info.variant ? "--variant ${stream_info.variant}" : ""
-        shwrap("cosa init --branch ${branch} ${variant} --commit=${src_config_commit} https://github.com/${repo}")
+        shwrap("cosa init --branch ${branch} ${variant} ${yumrepos} ${yumrepos_ref} --commit=${src_config_commit} https://github.com/${repo}")
 
         def lockfile, pkgChecksum, pkgTimestamp
         def skip_tests_arches = params.SKIP_TESTS_ARCHES.split()
@@ -135,6 +137,11 @@ lock(resource: "bump-${params.STREAM}") {
                             --url=s3://${s3_stream_dir}/builds
                         cosa fetch --update-lockfile --dry-run
                         """)
+                    } else if (arch in skip_tests_arches) {
+                        // The user has explicitly told us that it is OK to
+                        // skip tests on this architecture. Presumably because
+                        // they already passed in a previous run.
+                        echo "Skipping Fetch Metadata on ${arch}"
                     } else {
                         pipeutils.withExistingCosaRemoteSession(
                             arch: arch, session: archinfo[arch]['session']) {
@@ -213,13 +220,13 @@ lock(resource: "bump-${params.STREAM}") {
                         }
                         def n = ncpus - 1 // remove 1 for upgrade test
                         kola(cosaDir: env.WORKSPACE, parallel: n, arch: arch,
-                             marker: arch, allowUpgradeFail: params.ALLOW_KOLA_UPGRADE_FAILURE)
+                            marker: arch, allowUpgradeFail: params.ALLOW_KOLA_UPGRADE_FAILURE)
                         stage("${arch}:Build Metal") {
                             shwrap("cosa buildextend-metal")
                             shwrap("cosa buildextend-metal4k")
                         }
                         stage("${arch}:Build Live") {
-                            shwrap("cosa buildextend-live --fast")
+                            shwrap("cosa buildextend-live")
                             // Test metal4k with an uncompressed image and metal with a
                             // compressed one
                             shwrap("cosa compress --artifact=metal")
@@ -295,7 +302,7 @@ lock(resource: "bump-${params.STREAM}") {
         throw e
     } finally {
         if (currentBuild.result != 'SUCCESS') {
-            pipeutils.trySlackSend(message: "<${env.BUILD_URL}|bump-lockfile #${env.BUILD_NUMBER} (${params.STREAM})>")
+            // pipeutils.trySlackSend(message: "<${env.BUILD_URL}|bump-lockfile #${env.BUILD_NUMBER} (${params.STREAM})>")
         }
     }
 }}} // cosaPod, timeout, and lock finish here
