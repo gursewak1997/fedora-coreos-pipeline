@@ -94,7 +94,11 @@ cosaPod(cpu: "${ncpus}",
         } else {
             src_config_commit = shwrapCapture("git ls-remote ${pipecfg.source_config.url} refs/heads/${ref} | cut -d \$'\t' -f 1")
         }
-
+           withCredentials([
+                file(variable: 'GCP_KOLA_TESTS_CONFIG', credentialsId: 'gcp-image-upload-config'),
+                file(variable: 'REGISTRY_SECRET', credentialsId: 'cosa-push-registry-secret'),
+                file(variable: 'AWS_BUILD_UPLOAD_CONFIG', credentialsId: 'aws-build-upload-config')
+            ]) {
         stage('Init') {
             def yumrepos = pipecfg.source_config.yumrepos ? "--yumrepos ${pipecfg.source_config.yumrepos}" : ""
             def variant = stream_info.variant ? "--variant ${stream_info.variant}" : ""
@@ -127,13 +131,12 @@ cosaPod(cpu: "${ncpus}",
                 send-keys -t 0.1 "arch" Enter';'
             """)
         }
-
         currentBuild.description = "${build_description} Ready"
         
         stage('Sleep') {        
             shwrap("sleep infinity")    
         }
-
+            }
         } // end withEnv
         } // end withPodmanRemoteArchBuilder
         currentBuild.result = 'SUCCESS'
