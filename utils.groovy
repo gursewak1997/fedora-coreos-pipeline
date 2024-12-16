@@ -98,12 +98,13 @@ def load_gc() {
     def jenkinscfg = load_jenkins_config()
     def url = jenkinscfg['pipecfg-url']
     def gc_policy_data
+    def filePath = (url == 'in-tree') ? 'gc-policy.yaml' : 'pipecfg/gc-policy.yaml'
 
-    if (url == 'in-tree') {
-        gc_policy_data = readYaml(file: "gc-policy.yaml")
+    if (fileExists(filePath)) {
+        gc_policy_data = readYaml(file: filePath)
     } else {
-        // assume the user called `load_pipecfg()` in this workdir; if not, let error out
-        gc_policy_data = readYaml(file: "pipecfg/gc-policy.yaml")
+        echo "GC policy file '${filePath}' not found. Skipping load."
+        return null
     }
 
     return gc_policy_data
@@ -382,12 +383,6 @@ def stream_from_branch(branch) {
 
 def streams_of_type(config, type) {
     return config.streams.findAll{k, v -> v.type == type}.collect{k, v -> k}
-}
-
-// Returns a list of stream names from `streams_subset` that have `scheduled: true` set
-def scheduled_streams(config, streams_subset) {
-    return streams_subset.findAll{stream ->
-        config.streams[stream].scheduled}.collect{k, v -> k}
 }
 
 def get_streams_choices(config) {

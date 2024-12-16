@@ -5,6 +5,7 @@ node {
     // these are script global vars
     pipeutils = load("utils.groovy")
     pipecfg = pipeutils.load_pipecfg()
+    gc_policy_data = pipeutils.load_gc()
 }
 
 properties([
@@ -97,7 +98,8 @@ cosaPod(cpu: "${ncpus}",
            withCredentials([
                 file(variable: 'GCP_KOLA_TESTS_CONFIG', credentialsId: 'gcp-image-upload-config'),
                 file(variable: 'REGISTRY_SECRET', credentialsId: 'cosa-push-registry-secret'),
-                file(variable: 'AWS_BUILD_UPLOAD_CONFIG', credentialsId: 'aws-build-upload-config')
+                file(variable: 'AWS_BUILD_UPLOAD_CONFIG', credentialsId: 'aws-build-upload-config'),
+                file(variable: 'OPENSTACK_KOLA_TESTS_CONFIG', credentialsId: 'openstack-kola-tests-config')
             ]) {
         stage('Init') {
             def yumrepos = pipecfg.source_config.yumrepos ? "--yumrepos ${pipecfg.source_config.yumrepos}" : ""
@@ -132,7 +134,14 @@ cosaPod(cpu: "${ncpus}",
             """)
         }
         currentBuild.description = "${build_description} Ready"
-        
+        if (gc_policy_data) {
+            println "GC Policy Data: ${gc_policy_data}"
+            echo "test pass"
+        }
+        else {
+            println "GC Policy Data in else: ${gc_policy_data}"
+            echo "ITS NULL not there but ok"
+        }
         stage('Sleep') {        
             shwrap("sleep infinity")    
         }
